@@ -1,0 +1,58 @@
+#!/bin/bash
+regexes=(
+    "[\!(,%]" # Ignore noisy characters
+    ".{100,}" # Ignore lines with more than 100 characters (overly specific)
+    ".{15,}" # Ignore lines with more than 100 characters (overly specific)
+    "[0-9]{4,}" # Ignore lines with 4 or more consecutive digits (likely an id)
+    "[0-9]{3,}$" # Ignore lines where the last 3 or more characters are digits (likely an id)
+    "[a-z0-9]{32}" # Likely MD5 hash or similar
+    "[0-9]+[A-Z0-9]{5,}" # Number followed by 5 or more numbers and uppercase letters (almost all noise)
+    "\/.*\/.*\/.*\/.*\/.*\/.*\/" # Ignore lines more than 6 directories deep (overly specific)
+    "\w{8}-\w{4}-\w{4}-\w{4}-\w{12}" # Ignore UUIDs
+    "[0-9]+[a-zA-Z]+[0-9]+[a-zA-Z]+[0-9]+" # Ignore multiple numbers and letters mixed together (likley noise)
+    "\.(png|jpg|jpeg|gif|svg|bmp|ttf|avif|wav|mp4|aac|ajax|css|all|)$" # Ignore low value filetypes
+    "^http" # Ignore web addresses
+)
+
+# Full list
+echo "[+] Building lists..."
+for f in dict/*.txt;
+	do cat $f >> onelistforall_all_tmp.txt
+done
+# Short list
+# for f in dict/*_short.txt;
+# 	do cat $f >> onelistforall_short_tmp.txt 2>/dev/null
+# done
+echo "[+] Building done!"
+
+cmd1="cat onelistforall_all_tmp.txt"
+# cmd2="cat onelistforall_short_tmp.txt"
+# Removing buggy lines
+echo "[+] Cleaning lines..."
+for regex in "${regexes[@]}"; do
+    cmd1="$cmd1 | grep -avE '${regex}'"
+    # cmd2="$cmd2 | grep -avE '${regex}'"
+done
+
+cmd1="${cmd1} > onelistforall_big.txt"
+# cmd2="${cmd2} > onelistforall_short.txt"
+
+eval $cmd1
+# eval $cmd2
+
+echo "[+] Cleaning done!"
+cwd=$(pwd | cut -d "/" -f5) 
+shortlines=1000000
+echo "[+] Deduplication in progress..."
+duplicut onelistforall_big.txt -c -o ${cwd}.txt
+# duplicut onelistforall_short.txt -c -o ${cwd}short.txt
+echo "[+] Deduplication done!"
+wait
+cat ${cwd}.txt | head -n $shortlines >> ${cwd}_short.txt
+wait
+final_lines=$(cat ${cwd}.txt | wc -l)
+final_lines_short=$(cat ${cwd}_short.txt | wc -l)
+echo "[+] ${cwd}.txt has ${final_lines} lines"
+echo "[+] ${cwd}_short.txt has ${final_lines_short} lines"
+rm -f onelistforall_*.txt
+echo "[+] End"
